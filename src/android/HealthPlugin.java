@@ -24,9 +24,13 @@ import com.google.android.gms.fitness.data.HealthDataTypes;
 import com.google.android.gms.fitness.data.HealthFields;
 import com.google.android.gms.fitness.data.SleepStages;
 import com.google.android.gms.fitness.data.Value;
+import com.google.android.gms.fitness.data.Session;
+
 import com.google.android.gms.fitness.request.DataDeleteRequest;
 import com.google.android.gms.fitness.request.DataReadRequest;
 import com.google.android.gms.fitness.result.DataReadResponse;
+import com.google.android.gms.fitness.request.SessionReadRequest;
+import com.google.android.gms.fitness.result.SessionReadResponse;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 
@@ -524,6 +528,36 @@ public class HealthPlugin extends CordovaPlugin {
       readRequestBuilder.setLimit(limit);
     }
 
+    if (dt.equals(DataType.TYPE_SLEEP_SEGMENT)) {
+        SessionReadRequest.Builder request = new SessionReadRequest.Builder()
+            .readSessionsFromAllApps()
+            .includeSleepSessions()
+            .read(dt)
+            .setTimeInterval(st, et, TimeUnit.MILLISECONDS);
+
+        Task<SessionReadResponse> queryTask = Fitness.getSessionsClient(this.cordova.getContext(), this.account)
+            .readSession(request.build());
+
+        SessionReadResponse response = Tasks.await(queryTask);
+        if (!response.getStatus().isSuccess()) {
+            callbackContext.error(response.getStatus().getStatusMessage());
+            return;
+        }
+        List<Session> sessions = response.getSessions();
+        JSONArray resultset = new JSONArray();
+        for (Session session : sessions) {
+            JSONObject obj = new JSONObject();
+            obj.put("startDate", session.getStartTime(TimeUnit.MILLISECONDS));
+            obj.put("endDate", session.getEndTime(TimeUnit.MILLISECONDS));
+            long sleepTime = session.getEndTime(TimeUnit.MILLISECONDS) - session.getStartTime(TimeUnit.MILLISECONDS);
+            obj.put("value", sleepTime);
+            obj.put("unit", "s");
+            resultset.put(obj);
+        }
+        callbackContext.success(resultset);
+        return;
+    }
+    
     Task<DataReadResponse> queryTask = Fitness.getHistoryClient(this.cordova.getContext(), this.account)
       .readData(readRequestBuilder.build());
 
